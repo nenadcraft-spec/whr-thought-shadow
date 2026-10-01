@@ -70,23 +70,32 @@ No single input method is assumed to be universal or reliable.
 ┌─ TEXT_INPUT_ADAPTER ─┐
 USER ──────────┤                      ├─→ THOUGHT_SHADOW_CORE
                └─ VOICE_INPUT_ADAPTER ┘            │
-                                                    ↓
-                                             SHADOW_CHECK
-                                                    ↓
-                                         SHADOW_OF_SHADOW
-                                            (bounded)
-                                                    ↓
-                                  HOLD / PROCEED / CONFIRM
-                                                    ↓
-                                      SEMANTIC_CONFIRM
-                                                    ↓
-                                         TOOL_APPROVAL
-                                                    ↓
-                                             AI_PROCESS
-                                                    ↓
-                                         SHADOW_REFLECTION
-                                                    ↓
-                                             USER_FINAL
+                                                   ↓
+                                            SHADOW_CHECK
+                                                   ↓
+                                        SHADOW_OF_SHADOW
+                                           (bounded)
+                                                   ↓
+                                            DECISION
+                                          /    |     \
+                                         /     |      \
+                                      HOLD   PROCEED   CONSEQUENTIAL
+                                       │    (NON_SE)    SIDE_EFFECT
+                                       │       │            │
+                                       ↓       ↓            ↓
+                             USER_CLARIFICATION AI_PROCESS SEMANTIC_CONFIRM
+                                       │       │            │
+                                       ↓       │            ↓
+                                    NEW_INPUT  │       TOOL_APPROVAL
+                                       │       │            │
+                                       └──────→│            ↓
+                                               │        AI_PROCESS
+                                               │            │
+                                               └──────┬─────┘
+                                                      ↓
+                                             SHADOW_REFLECTION
+                                                      ↓
+                                                 USER_FINAL
 ```
 
 ---
