@@ -235,7 +235,7 @@ Each adapter must:
   "risk_level": str (low | medium | high),
   "is_clear_for_action": bool,
   "reason_if_unclear": str,
-  "content_origin": str (user_provided),
+  "content_origin": str (USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT),
   "metadata": dict
 }
 ```
@@ -254,14 +254,14 @@ Responsible for:
 
 ### Content provenance
 ```text
-subject_origin: "user_provided"
-body_origin: "user_provided"
+subject_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
+body_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
 ```
 
-If adaptation/correction occurs:
+If adaptation/correction occurs, provenance must remain explicit per field:
 ```text
-subject_origin: "user_provided" | "ai_inferred"
-body_origin: "user_provided" | "ai_inferred"
+subject_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
+body_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
 ```
 
 ---
@@ -284,21 +284,35 @@ PAUSE ≠ END_OF_COMMAND
 REPETITION ≠ REPEATED_ACTION
 ```
 
-These are audio quality issues, NOT intent clarity issues.
+These are speech-delivery/disfluency characteristics, not semantic ambiguity by themselves.
+
+### Locked voice fields
+```text
+stt_quality = ok | unintelligible
+disfluency_present = true | false
+semantic_ambiguity_present = true | false
+```
 
 ### Output behavior
-If STT quality is poor but intent is clear:
+If STT quality is ok and intent is clear:
 ```text
 confidence: high (on intent)
 ambiguity_score: low
-metadata.stt_quality: "poor"
+metadata.stt_quality: "ok"
+```
+
+If STT quality is unintelligible:
+```text
+confidence: low (on intent)
+ambiguity_score: high
+metadata.stt_quality: "unintelligible"
 ```
 
 If intent itself is ambiguous:
 ```text
 confidence: low (on intent)
 ambiguity_score: high
-metadata.stt_quality: "ok" or "poor"
+metadata.stt_quality: "ok" or "unintelligible"
 ```
 
 ---
@@ -311,7 +325,7 @@ Core behavior:
 3. apply SHADOW_CHECK
 4. apply bounded SHADOW_OF_SHADOW
 5. evaluate HOLD vs PROCEED vs CONFIRM
-6. if CONFIRM required, generate confirmation request with `confirmation_id` and `request_fingerprint`
+6. if action is risky or consequential → SEMANTIC_CONFIRM_REQUIRED
 7. return decision packet
 
 ### Decision states
@@ -322,12 +336,15 @@ HOLD
 → request more information or clarification
 
 PROCEED
-→ clear intent, low risk, sufficient confidence
-→ move to SEMANTIC_CONFIRM
+→ clear intent, low risk, no consequential side effect
+→ continue processing
 
 CONFIRM
 → high risk or user safety concern
 → require explicit user confirmation with valid confirmation_state
+
+IF action is risky or consequential
+→ SEMANTIC_CONFIRM_REQUIRED
 ```
 
 ---
@@ -371,12 +388,20 @@ They understand consequences.
 They have seen the full plan.
 ```
 
-Both must pass before execution:
+Gate structure:
+
+**CONSEQUENTIAL_SIDE_EFFECT:**
 ```text
 SEMANTIC_CONFIRM = YES
 AND
 TOOL_APPROVAL = YES
-→ PROCEED_TO_AI_PROCESS
+→ EXECUTE_TOOL
+```
+
+**NON_SIDE_EFFECT (read-only, draft, retrieval):**
+```text
+TOOL_APPROVAL = NOT_APPLICABLE
+→ CONTINUE_PROCESSING
 ```
 
 ---
@@ -386,8 +411,8 @@ TOOL_APPROVAL = YES
 Every decision packet must track:
 
 ```text
-subject_origin: "user_provided" | "ai_inferred"
-body_origin: "user_provided" | "ai_inferred"
+subject_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
+body_origin: USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT
 metadata_origin: dict tracking per-field origin
 ```
 
@@ -399,11 +424,11 @@ This prevents:
 Example:
 ```text
 subject: "send email"
-  subject_origin: "user_provided"
+  subject_origin: USER_PROVIDED_CONTENT
 body: "to alice@example.com"
-  body_origin: "user_provided"
+  body_origin: USER_PROVIDED_CONTENT
 tone: "professional"
-  tone_origin: "ai_inferred" (not explicitly stated)
+  tone_origin: AI_GENERATED_DRAFT_CONTENT (not explicitly stated)
 ```
 
 ---
@@ -549,7 +574,8 @@ This spec is valid if:
 - adapters share the same core contract
 - SPEECH_DISFLUENCY is distinguished from SEMANTIC_AMBIGUITY
 - SEMANTIC_CONFIRM and TOOL_APPROVAL are separate gates
-- content provenance is tracked
+- tool approval is NOT_APPLICABLE for non-side-effect operations
+- content provenance is tracked as USER_PROVIDED_CONTENT or AI_GENERATED_DRAFT_CONTENT
 - feedback supports verification, not closure
 - SHADOW_OF_SHADOW remains bounded (RELAX_ONCE)
 - LIGHT_MODEL = ELASTIC_FEEDBACK holds exactly
@@ -563,8 +589,9 @@ This spec is valid if:
   - VOICE_INPUT_ADAPTER
   - THOUGHT_SHADOW_CORE unified
   - Stateful confirmation
-  - Content provenance
+  - Content provenance (USER_PROVIDED_CONTENT | AI_GENERATED_DRAFT_CONTENT)
   - Bounded meta-check
+  - Consequence-aware gate structure
   - Case 16149600 validated
 
 ---
